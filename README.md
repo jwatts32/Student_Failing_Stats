@@ -1,1 +1,2 @@
 # Student_Failing_Stats
+This project includes statistics on students who failed at least 1 class during the first two weeks of the school year.  Students were categorized into many different groups (ethncity/race, grade level, LEP (Limited English Proficiency) Vs. Non-LEP, Athletes vs. Non-athletes, etc).  However, the major focus was the Learn At Home Vs. Learn At School Students.  This particular comparison was used to make a decision of if and when all students would be required to end remote learning and return back to in-class instruction.   
