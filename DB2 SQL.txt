@@ -1,0 +1,1395 @@
+Drop Procedure SP_C_RPT_FAILURE_STATS;
+--Call SP_C_RPT_FAILURE_STATS({?p_FiscalYear},'{?p_Campus}','{?p_Calendar}',{?p_Grade_From},{?p_Grade_Thru},'{?p_Subject}','{?p_Dual_Credit}','{?p_Grade_Type_Name}','{?p_Grade_Level_Detail}','{?p_District_Summary}','{?p_Include_Boshears}','{?p_Order_By}')
+--Call SP_C_RPT_FAILURE_STATS(2021,'041','1',9,11,'{?p_Subject}','{?p_Dual_Credit}','1ST SIX WEEKS','{?p_Grade_Level_Detail}','{?p_District_Summary}','N','{?p_Order_By}')
+--Call SP_C_RPT_FAILURE_STATS(2021,'001','1',12,15,'{?p_Subject}','{?p_Dual_Credit}','1ST SIX WEEKS','{?p_Grade_Level_Detail}','{?p_District_Summary}','N','{?p_Order_By}')
+--Call SP_C_RPT_FAILURE_STATS(2021,'001','1',5,15,'{?p_Subject}','{?p_Dual_Credit}','1ST SIX WEEKS','{?p_Grade_Level_Detail}','{?p_District_Summary}','N','{?p_Order_By}')
+--Call SP_C_RPT_FAILURE_STATS(2021,'{?Campus}','1',5,15,'{?p_Subject}','{?p_Dual_Credit}','1ST SIX WEEKS','{?p_Grade_Level_Detail}','{?p_District_Summary}','N','{?p_Order_By}')
+
+-- Select * From SESSION_CUST_RPT_FAILURE_STATS_STU
+-- Select * From SESSION_CUST_RPT_FAILURE_STATS_GRADES
+-- Select * From SESSION_CUST_RPT_FAILURE_STATS_RAW
+-- Select * From SESSION_CUST_RPT_FAILURE_STATS_ROWS T Where T.RANDOM_NUMBER = 674722
+
+/*
+Delete From SESSION_CUST_RPT_FAILURE_STATS_STU;
+Delete From SESSION_CUST_RPT_FAILURE_STATS_GRADES;
+Delete From SESSION_CUST_RPT_FAILURE_STATS_RAW;
+Delete From SESSION_CUST_RPT_FAILURE_STATS_ROWS;
+*/
+
+/#
+Create Procedure SP_C_RPT_FAILURE_STATS (
+  in p_FiscalYear         Integer,
+  in p_Campus             VarChar(5),
+  in p_Calendar           VarChar(5),
+  in p_Grade_From         Integer,       -- 1 - 15 corresponding to grade in RFS_STU_GRADE
+  in p_Grade_Thru         Integer,       -- 1 - 15 corresponding to grade in RFS_STU_GRADE
+  in p_Subject            VarChar(12),   -- (All/All Core/ELA/MTH/SCI/SOC)
+  in p_Dual_Credit        VarChar(4),    -- (Y/N/Only)
+  in p_Grade_Type_Name    VarChar(32),   -- (1ST SIX WEEKS, etc.)
+  in p_Grade_Level_Detail VarChar(12),   -- Yes/No/Minimum
+  in p_District_Summary   VarChar(1),    -- Y/N
+  in p_Include_Boshears   VarChar(1),    -- Y/N
+  in p_Order_By           VarChar(32)    -- Campus, Student Category
+ )
+
+Language SQL 
+Specific TEAMS.SP_C_RPT_FAILURE_STATS
+Dynamic Result Sets 1 
+
+--*****************************************************************************--   
+--
+
+--
+--
+--*****************************************************************************
+Begin
+ 
+--Declare Variables
+Declare v_FiscalYear          Integer;
+Declare v_Campus              VarChar(5);
+Declare v_Calendar            VarChar(5);
+Declare v_Grade_From          Integer;
+Declare v_Grade_Thru          Integer;
+Declare v_Subject             VarChar(12);   -- (Core Subject/All Core/All), 
+Declare v_Dual_Credit         VarChar(4); 
+Declare v_Grade_Type_Name     VarChar(32);
+Declare v_Grade_Level_Detail  VarChar(12);   -- Yes/No/Minimum
+Declare v_District_Summary    VarChar(1);
+Declare v_Include_Boshears    VarChar(1);
+Declare v_Order_By            VarChar(32);   -- (School, Grade, Teacher), 
+
+Declare v_Grade_From_Char     VarChar(2);
+Declare v_Grade_Thru_Char     VarChar(2);
+
+Declare v_As_Of_Date          Date;
+
+Declare v_Random_Number       Integer;
+Declare v_Current_TimeStamp   TimeStamp;
+Declare v_Rpt_By_Grade        VarChar(1);
+
+
+-- Temp SQL Statement Text Variable
+Declare vTmpSQL VarChar(2000);
+
+-- Result Set Cursor
+Declare vResultSetCur Cursor With Return For STMNT1_NAME;
+
+
+Declare Global Temporary Table SESSION.CUST_RPT_FAILURE_STATS_STU (
+    -- Drop Table SESSION_CUST_RPT_FAILURE_STATS_STU
+    -- Create Table SESSION_CUST_RPT_FAILURE_STATS_STU (
+  RANDOM_NUMBER         Integer,
+  BUILD_TS              TimeStamp,
+  FY                    Integer     Not Null,
+  LOC_ID                VarChar(5)  Not Null,
+  LOC_NAME              VarChar(32),
+  CAL_ID                VarChar(5)  Not Null,
+  GRADE                 VarChar(3),
+  GRADE_SORT            Integer,
+  PER_ID                VarChar(12) Not Null,
+  AS_OF_DATE            Date,
+  GRADE_TYPE_NAME       VarChar(32),
+  NBR_FAILING_GRADES    Integer,
+  INS_METHOD            VarChar(32),
+  UIL_STATUS            VarChar(3),
+  ETHNICITY             VarChar(15),
+  GENDER                VarChar(1),
+  ENR_STU               Integer,
+  L@H                   Integer,
+  L@S                   Integer,
+  NON_UIL_STU           Integer,
+  UIL_STU               Integer,
+  LEP                   Integer,
+  NON_LEP               Integer,
+  AFRICAN_AM            Integer,
+  HISPANIC              Integer,
+  WHITE                 Integer,
+  OTHER_ETH             Integer,
+  MALE                  Integer,
+  FEMALE                Integer
+  --,Primary Key (FY, LOC_ID, CAL_ID, PER_ID)
+) With Replace;
+
+
+Declare Global Temporary Table SESSION.CUST_RPT_FAILURE_STATS_GRADES (
+    -- Drop Table SESSION_CUST_RPT_FAILURE_STATS_GRADES
+    -- Create Table SESSION_CUST_RPT_FAILURE_STATS_GRADES (
+  RANDOM_NUMBER         Integer,
+  BUILD_TS              TimeStamp,
+  FY                    Integer     Not Null,
+  LOC_ID                VarChar(5)  Not Null,
+  CAL_ID                VarChar(5)  Not Null,
+  PER_ID                VarChar(12) Not Null,
+  AS_OF_DATE            Date,
+  GRADE_TYPE_NAME       VarChar(32),
+  STU_GRD_GROUP_ID      VarChar(12) Not Null,
+  DIST_COURSE_ID        VarChar(12),
+  LOC_CRS_SECTION_ID    VarChar(12),
+  COR_REQ_STS           VarChar(1),
+  GRADES_ISSUED         VarChar(1),
+  COURSE_CORE           VarChar(1),
+  COURSE_SUBJECT        VarChar(12),
+  DUAL_CREDIT           VarChar(1),
+  TEACHER_PCN           VarChar(12),
+  TEACHER_PER_ID        VarChar(12),
+  TEACHER_LFM           VarChar(64),
+  GRADE_VALUE           VarChar(4),
+  GRADE_NUMERIC         Integer,
+  GRADE_INCLUDED        VarChar(1),
+  GRADE_FAILING         Integer
+  --,Primary Key (FY, LOC_ID, CAL_ID, PER_ID, STU_GRD_GROUP_ID)
+) With Replace;
+
+
+Declare Global Temporary Table SESSION.CUST_RPT_FAILURE_STATS_RAW (
+    -- Drop Table SESSION_CUST_RPT_FAILURE_STATS_RAW
+    -- Create Table SESSION_CUST_RPT_FAILURE_STATS_RAW (
+  RANDOM_NUMBER         Integer,
+  BUILD_TS              TimeStamp,
+  FY                    Integer,
+  LOC_ID                VarChar(5),
+  LOC_NAME              VarChar(32),
+  AS_OF_DATE            Date,
+  GRADE_TYPE_NAME       VarChar(32),
+  GRADE                 VarChar(3),
+  ENR_STU               Decimal(12,2),
+  ENR_STU_FAILING       Decimal(12,2),
+  ENR_STU_FAILING1      Decimal(12,2),
+  ENR_STU_FAILING2P     Decimal(12,2),
+  L@H                   Decimal(12,2),
+  L@H_FAILING           Decimal(12,2),
+  L@H_FAILING1          Decimal(12,2),
+  L@H_FAILING2P         Decimal(12,2),
+  L@S                   Decimal(12,2),
+  L@S_FAILING           Decimal(12,2),
+  L@S_FAILING1          Decimal(12,2),
+  L@S_FAILING2P         Decimal(12,2),
+  NON_UIL_STU           Decimal(12,2),
+  NON_UIL_STU_FAILING   Decimal(12,2),
+  NON_UIL_STU_FAILING1  Decimal(12,2),
+  NON_UIL_STU_FAILING2P Decimal(12,2),
+  UIL_STU               Decimal(12,2),
+  UIL_STU_FAILING       Decimal(12,2),
+  UIL_STU_FAILING1      Decimal(12,2),
+  UIL_STU_FAILING2P     Decimal(12,2),
+  LEP                   Decimal(12,2),
+  LEP_FAILING           Decimal(12,2),
+  LEP_FAILING1          Decimal(12,2),
+  LEP_FAILING2P         Decimal(12,2),
+  NON_LEP               Decimal(12,2),
+  NON_LEP_FAILING       Decimal(12,2),
+  NON_LEP_FAILING1      Decimal(12,2),
+  NON_LEP_FAILING2P     Decimal(12,2),
+  AFRICAN_AM            Decimal(12,2),
+  AFRICAN_AM_FAILING    Decimal(12,2),
+  AFRICAN_AM_FAILING1   Decimal(12,2),
+  AFRICAN_AM_FAILING2P  Decimal(12,2),
+  HISPANIC              Decimal(12,2),
+  HISPANIC_FAILING      Decimal(12,2),
+  HISPANIC_FAILING1     Decimal(12,2),
+  HISPANIC_FAILING2P    Decimal(12,2),
+  WHITE                 Decimal(12,2),
+  WHITE_FAILING         Decimal(12,2),
+  WHITE_FAILING1        Decimal(12,2),
+  WHITE_FAILING2P       Decimal(12,2),
+  OTHER_ETH             Decimal(12,2),
+  OTHER_ETH_FAILING     Decimal(12,2),
+  OTHER_ETH_FAILING1    Decimal(12,2),
+  OTHER_ETH_FAILING2P   Decimal(12,2),
+  MALE                  Decimal(12,2),
+  MALE_FAILING          Decimal(12,2),
+  MALE_FAILING1         Decimal(12,2),
+  MALE_FAILING2P        Decimal(12,2),
+  FEMALE                Decimal(12,2),
+  FEMALE_FAILING        Decimal(12,2),
+  FEMALE_FAILING1       Decimal(12,2),
+  FEMALE_FAILING2P      Decimal(12,2)
+
+--,Primary Key (FY, LOC_ID, CAL_ID, AS_OF_DATE, GRADE_TYPE_NAME)
+) With Replace;
+
+Declare Global Temporary Table SESSION.CUST_RPT_FAILURE_STATS_ROWS (
+    -- Drop Table SESSION_CUST_RPT_FAILURE_STATS_ROWS
+    -- Create Table SESSION_CUST_RPT_FAILURE_STATS_ROWS(
+  RANDOM_NUMBER         Integer,
+  BUILD_TS              TimeStamp,
+  FY                    Integer,
+  LOC_ID                VarChar(5),
+  LOC_NAME              VarChar(32),
+  AS_OF_DATE            Date,
+  GRADE                 VarChar(3),
+  GRADE_TYPE_NAME       VarChar(32),
+  RPT_GRADE_FROM        VarChar(2),
+  RPT_GRADE_THRU        VarChar(2),
+  RPT_SUBJECT           VarChar(12),   -- (All/All Core/ELA/MTH/SCI/SOC)
+  RPT_DUAL_CREDIT       VarChar(4),    -- (Y/N/Only)
+  ROW_TITLE             VarChar(64),
+  ROW_SORT              Integer,
+  LINE_GROUP            Integer,
+  FAILING_STU           Integer,
+  FAILING_STU1          Integer,
+  FAILING_STU2P         Integer,
+  TOTAL_STU             Integer,
+  FAILING_PCT           Decimal(12,2),
+  FAILING_PCT1          Decimal(12,2),
+  FAILING_PCT2P         Decimal(12,2)
+--,Primary Key (FY, LOC_ID, CAL_ID, AS_OF_DATE, GRADE_TYPE_NAME, ROW_SORT)
+) With Replace;
+
+
+
+--############################################################################## 
+  
+-- Set Temp Variables from Incoming Params
+Set v_FiscalYear          = p_FiscalYear;
+Set v_Campus              = p_Campus;
+Set v_Calendar            = p_Calendar;
+Set v_Grade_From          = p_Grade_From;
+Set v_Grade_Thru          = p_Grade_Thru;
+Set v_Subject             = p_Subject;
+Set v_Dual_Credit         = p_Dual_Credit;
+Set v_Grade_Type_Name     = p_Grade_Type_Name;
+Set v_Grade_Level_Detail  = p_Grade_Level_Detail;
+Set v_District_Summary    = p_District_Summary;
+Set v_Include_Boshears    = p_Include_Boshears;
+Set v_Order_By            = p_Order_By;
+
+-- Capitalize Incoming Parameters as appropriate
+If Upper(v_Campus)   = 'ALL'  Then Set v_Campus   = 'ALL'; End If;
+If Upper(v_Calendar) = 'ALL'  Then Set v_Calendar = 'ALL'; End If;
+
+Set v_Subject             = Upper(v_Subject);
+Set v_Dual_Credit         = Upper(v_Dual_Credit);
+Set v_Grade_Level_Detail  = Upper(v_Grade_Level_Detail);
+Set v_District_Summary    = Upper(v_District_Summary);
+Set v_Include_Boshears    = Upper(v_Include_Boshears);
+Set v_Order_By            = Upper(v_Order_By);
+
+-- Determine the As Of Date based on the Grade Period Given
+Case When v_Campus = 'ALL' and v_Calendar = 'ALL'
+      Then Set v_As_Of_Date = (Select SW.SW_END_DATE From V_C_STU_SIX_WEEKS SW Where SW.STUDENT_CAL_FISCAL_YEAR = v_FiscalYear and SW.LOC_ID = '001' and SW.STUDENT_CAL_ID = '1' and SW.SW_NAME = v_Grade_Type_Name);
+     When v_Campus = 'ALL' and v_Calendar <> 'ALL'
+      Then Set v_As_Of_Date = (Select SW.SW_END_DATE From V_C_STU_SIX_WEEKS SW Where SW.STUDENT_CAL_FISCAL_YEAR = v_FiscalYear and SW.LOC_ID = '001' and SW.STUDENT_CAL_ID = v_Calendar and SW.SW_NAME = v_Grade_Type_Name);
+     When v_Campus <> 'ALL' and v_Calendar = 'ALL'
+      Then Set v_As_Of_Date = (Select SW.SW_END_DATE From V_C_STU_SIX_WEEKS SW Where SW.STUDENT_CAL_FISCAL_YEAR = v_FiscalYear and SW.LOC_ID = v_Campus and SW.STUDENT_CAL_ID = '1' and SW.SW_NAME = v_Grade_Type_Name);
+     When v_Campus <> 'ALL' and v_Calendar <> 'ALL'
+      Then Set v_As_Of_Date = (Select SW.SW_END_DATE From V_C_STU_SIX_WEEKS SW Where SW.STUDENT_CAL_FISCAL_YEAR = v_FiscalYear and SW.LOC_ID = v_Campus and SW.STUDENT_CAL_ID = v_Calendar and SW.SW_NAME = v_Grade_Type_Name); 
+     Else Set v_As_Of_Date =  Current_Date;  -- Default
+End Case;
+  
+
+Set v_Grade_From_Char = (Select GR.RFS_GRADE_CODE From RFS_STU_GRADE GR Where GR.RFS_GRADE_SORT_ORDER = v_Grade_From);
+Set v_Grade_Thru_Char = (Select GR.RFS_GRADE_CODE From RFS_STU_GRADE GR Where GR.RFS_GRADE_SORT_ORDER = v_Grade_Thru);
+
+Set v_Random_Number     = Cast( (Rand() * 1000000) as Integer);
+Set v_Current_TimeStamp = Current_TimeStamp;
+
+--Delete Records from Prior Run:
+Delete From SESSION.CUST_RPT_FAILURE_STATS_STU Where RANDOM_NUMBER = v_Random_Number or BUILD_TS <= Current_Date - 7 Days;
+Delete From SESSION_CUST_RPT_FAILURE_STATS_STU Where RANDOM_NUMBER = v_Random_Number or BUILD_TS <= Current_Date - 7 Days;
+
+Delete From SESSION.CUST_RPT_FAILURE_STATS_GRADES Where RANDOM_NUMBER = v_Random_Number or BUILD_TS <= Current_Date - 7 Days;
+Delete From SESSION_CUST_RPT_FAILURE_STATS_GRADES Where RANDOM_NUMBER = v_Random_Number or BUILD_TS <= Current_Date - 7 Days;
+
+Delete From SESSION.CUST_RPT_FAILURE_STATS_RAW Where RANDOM_NUMBER = v_Random_Number or BUILD_TS <= Current_Date - 7 Days;
+Delete From SESSION_CUST_RPT_FAILURE_STATS_RAW Where RANDOM_NUMBER = v_Random_Number or BUILD_TS <= Current_Date - 7 Days;
+
+
+Delete From SESSION.CUST_RPT_FAILURE_STATS_ROWS Where RANDOM_NUMBER = v_Random_Number or BUILD_TS <= Current_Date - 7 Days;
+Delete From SESSION_CUST_RPT_FAILURE_STATS_ROWS Where RANDOM_NUMBER = v_Random_Number or BUILD_TS <= Current_Date - 7 Days;
+
+
+
+
+------ TEMP  --------------------------------------
+--Delete From SESSION_CUST_RPT_FAILURE_STATS_STU;
+--Delete From SESSION_CUST_RPT_FAILURE_STATS_GRADES;
+--Delete From SESSION_CUST_RPT_FAILURE_STATS_RAW;
+--Delete From SESSION_CUST_RPT_FAILURE_STATS_ROWS;
+
+
+
+
+--############################################################################## 
+-- Build Table of Students to be included with Indicators for Stat Items
+--############################################################################## 
+Insert into SESSION_CUST_RPT_FAILURE_STATS_STU
+  Select
+    v_Random_Number as RANDOM_NUMBER,
+    v_Current_TimeStamp as BUILD_TS,
+    SE.STU_ENR_FISCAL_YEAR as FY,
+    SE.LOC_ID,
+    LC.LOC_NAME,
+    SE.STUDENT_CAL_ID as CAL_ID,
+    SE.RFS_GRADE_CODE as GRADE,
+    SE.RFS_GRADE_SORT_ORDER as GRADE_SORT,
+    SE.PER_ID,
+    v_As_Of_Date as AS_OF_DATE,
+    v_Grade_Type_Name as GRADE_TYPE_NAME,
+    Null as NBR_FAILING_GRADES,
+    Coalesce(IMH.INSTRUCTIONAL_METHOD,'Learn At School') as INS_METHOD,
+    Case When Coalesce(UIL.UIL_STU,0) = 1 Then 'Y' Else 'N' End as UIL_STATUS,
+    PE.ETH_FOR_STATS as ETHNICITY,
+    PF.PER_GENDER as GENDER,
+    1 as ENR_STU,
+    Case When Coalesce(IMH.INSTRUCTIONAL_METHOD,'Learn At School') = 'Learn At Home'   Then 1 Else 0 End as L@H,
+    Case When Coalesce(IMH.INSTRUCTIONAL_METHOD,'Learn At School') = 'Learn At School' Then 1 Else 0 End as L@S,
+    Case When Coalesce(UIL.UIL_STU,0) = 0 Then 1 Else 0 End as NON_UIL_STU,
+    Case When Coalesce(UIL.UIL_STU,0) = 1 Then 1 Else 0 End as UIL_STU,
+    
+    Case When Coalesce(LEP.LEP_STU,0) = 1 Then 1 Else 0 End as LEP,
+    Case When Coalesce(LEP.LEP_STU,0) = 0 Then 1 Else 0 End as NON_LEP,
+ 
+    Case When PE.ETH_FOR_STATS = 'African Am' Then 1 Else 0 End as AFRICAN_AM,
+    Case When PE.ETH_FOR_STATS = 'Hispanic'   Then 1 Else 0 End as HISPANIC,
+    Case When PE.ETH_FOR_STATS = 'White'      Then 1 Else 0 End as WHITE,
+    Case When PE.ETH_FOR_STATS Not in ('African Am','Hispanic','White') Then 1 Else 0 End as OTHER_ETH,
+    Case When PF.PER_GENDER = 'M' Then 1 Else 0 End as MALE,
+    Case When PF.PER_GENDER = 'F' Then 1 Else 0 End as FEMALE
+  
+  
+  From V_C_STU_ENR_CUR_AND_FUTURE SE
+  
+  Left Join LOCATION LC
+    on LC.LOC_ID = SE.LOC_ID
+ 
+  Left Join V_C_STU_INS_METHOD_HISTORY IMH
+    on  IMH.FISCAL_YR = SE.STU_ENR_FISCAL_YEAR
+    and IMH.PER_ID = SE.PER_ID
+    and IMH.STR_DATE <> Coalesce(IMH.END_DATE, Current_Date + 2 Years)
+    and IMH.STR_DATE <= v_As_Of_Date
+    and (IMH.END_DATE is Null or IMH.END_DATE >= v_As_Of_Date)
+  
+  Left Join (Select Distinct DTF.PER_ID, 1 as UIL_STU 
+             From STUDENT_DATE_TRACKED_VALUE DTF 
+             Where DTF.RFDS_DT_TRACK_FIELD_NM Like '%(Rank One)%'               -- Any Rank One Team from Rank One Import
+                or DTF.RFDS_DT_TRACK_FIELD_NM in ('(Stu Group) Band',           -- Or in Specific Stu Group from Schedule
+                                                  '(Stu Group) Choir',
+                                                  '(Stu Group) Orchestra',
+                                                  '(Stu Group) Cheerleading',
+                                                  '(Stu Group) Drill Team',
+                                                  '(Stu Group) Theater',
+                                                  '(Stu Group) Baseball',
+                                                  '(Stu Group) Basketball',
+                                                  '(Stu Group) Cross Country',
+                                                  '(Stu Group) Football',
+                                                  '(Stu Group) Golf',
+                                                  '(Stu Group) MS Athletics B',
+                                                  '(Stu Group) MS Athletics G',
+                                                  '(Stu Group) Soccer F',
+                                                  '(Stu Group) Soccer M',
+                                                  '(Stu Group) Softball',
+                                                  '(Stu Group) Swimming',
+                                                  '(Stu Group) Tennis',
+                                                  '(Stu Group) Track',
+                                                  '(Stu Group) Volleyball'
+                                                  )
+             ) UIL
+    on UIL.PER_ID = SE.PER_ID
+
+  Left Join (Select ST.PER_ID,
+                    Max(Case When DTF.RFDS_DT_TRACK_FIELD_NM = 'LEP Indicator' and DTF.STU_DT_TRK_VALUE = 'Identified As Limited English Proficient (LEP)' and STU_DT_TRK_END_PROG_FLG <> 'Y' Then 1 Else 0 End) as LEP_STU
+             From STUDENT ST
+             Left Join STUDENT_DATE_TRACKED_VALUE DTF
+               on ST.PER_ID = DTF.PER_ID
+             Where DTF.STU_DT_TRK_EFF_DATE <= v_As_Of_Date
+               and DTF.RFDS_DT_TRACK_FIELD_NM = 'LEP Indicator'
+               and Not Exists (Select * From STUDENT_DATE_TRACKED_VALUE as DTF2
+                               Where DTF2.PER_ID = DTF.PER_ID
+                                 and DTF2.RFDS_DT_TRACK_FIELD_NM = DTF.RFDS_DT_TRACK_FIELD_NM
+                                 and DTF2.STU_DT_TRK_EFF_DATE <= v_As_Of_Date
+                                 and DTF2.STU_DT_TRK_EFF_DATE > DTF.STU_DT_TRK_EFF_DATE
+                               )
+             Group By ST.PER_ID
+            ) LEP
+    on LEP.PER_ID = SE.PER_ID
+
+  Left Join V_C_PERSON_ETHNICITY PE
+    on PE.PER_ID = SE.PER_ID
+
+  Left Join PERSON PF
+    on PF.PER_ID = SE.PER_ID
+  
+  Where SE.STU_ENR_FISCAL_YEAR = v_FiscalYear
+    and (v_Campus = 'ALL' or v_District_Summary = 'Y' or SE.LOC_ID = v_Campus)
+    and (v_Calendar = 'ALL' or SE.STUDENT_CAL_ID = v_Calendar)
+    and (v_Include_Boshears = 'Y' or SE.STUDENT_CAL_ID <> 'BOSH')
+    and Coalesce(SE.RFS_GRADE_SORT_ORDER,0) Between v_Grade_From and v_Grade_Thru
+    and SE.STU_ENR_ENTRY_DATE <= v_As_Of_Date
+    and (SE.STU_ENR_EXIT_DATE is Null or SE.STU_ENR_EXIT_DATE > v_As_Of_Date)
+;
+
+
+-- Do not report schools with No Grades for Grade Type
+Delete From SESSION_CUST_RPT_FAILURE_STATS_STU ST
+    --select * from SESSION_CUST_RPT_FAILURE_STATS_STU ST
+Where Not Exists (Select * 
+                  From STUDENT_GRD_TYP_GRP_SEC_VAL GV
+                  Where GV.STUDENT_CAL_FISCAL_YEAR = ST.FY
+                    and GV.LOC_ID                  = ST.LOC_ID
+                    and GV.STUDENT_CAL_ID          = ST.CAL_ID
+                    and GV.GRADE_TYPE_NM           = ST.GRADE_TYPE_NAME
+                  )
+  and ST.RANDOM_NUMBER = v_Random_Number
+;
+
+--############################################################################## 
+-- Build Table of Students Grades with Fail or Not Failing Indicator
+--############################################################################## 
+
+Insert into SESSION_CUST_RPT_FAILURE_STATS_GRADES
+  Select 
+    ST.RANDOM_NUMBER,
+    ST.BUILD_TS,
+    ST.FY,
+    ST.LOC_ID,
+    ST.CAL_ID,
+    ST.PER_ID,
+    ST.AS_OF_DATE,
+    ST.GRADE_TYPE_NAME,
+    GV.STU_GRD_GROUP_ID,
+    GV.DIST_COURSE_ID,
+    GV.LOC_CRS_SECTION_ID,
+    SC.COR_REQ_STS,
+    SC.GRADES_ISSUED,
+    Case When DC.CORE_COURSE in ('ELA','MTH','SCI','SOC') Then 'Y' Else 'N' End as COURSE_CORE,
+    Case When DC.CORE_COURSE in ('ELA','MTH','SCI','SOC') Then DC.CORE_COURSE Else '' End as COURSE_SUBJECT,
+    Coalesce(DC.DIST_COURSE_DUAL_CREDIT,'N') as DUAL_CREDIT,
+    Null as TEACHER_PCN,
+    Null as TEACHER_PER_ID,
+    Null as TEACHER_LFM,
+    GV.STU_GRD_TYP_GRP_SEC_V_VCGRDVAL as GRADE_VALUE,
+    Coalesce(GE.CAMPUS_GRD_VAL_NUM_EQUIVALENT,0) as GRADE_NUMERIC,
+    Case When Coalesce(SC.GRADES_ISSUED,'Y') = 'N'                            Then 'N' 
+         When Coalesce(GV.STU_GRD_TYP_GRP_SEC_V_VCGRDVAL,'') in ('','NA','X') Then 'N'
+         Else 'Y' End as GRADE_INCLUDED,
+    Case When Coalesce(GE.CAMPUS_GRD_VAL_NUM_EQUIVALENT,0) < 70 Then 1 Else 0 End as GRADE_FAILING
+  
+  From SESSION_CUST_RPT_FAILURE_STATS_STU ST
+  
+  Join STUDENT_GRD_TYP_GRP_SEC_VAL GV
+    on  GV.STUDENT_CAL_FISCAL_YEAR = ST.FY
+    and GV.LOC_ID                  = ST.LOC_ID
+    and GV.STUDENT_CAL_ID          = ST.CAL_ID
+    and GV.PER_ID                  = ST.PER_ID
+    and GV.GRADE_TYPE_NM           = ST.GRADE_TYPE_NAME
+  
+  Left Join CAMPUS_GRADE_VALUE GE
+    on  GE.LOC_ID = GV.LOC_ID
+    and GE.RFD_STU_GRD_VAL_FISCAL_YR = GV.STUDENT_CAL_FISCAL_YEAR
+    and GE.RFD_STU_GRD_VAL_VCGRDVAL  = GV.STU_GRD_TYP_GRP_SEC_V_VCGRDVAL
+  
+  Left Join (Select Distinct GG.PER_ID, GG.STU_GRD_GROUP_ID,
+                GG.DIST_COURSE_FISCAL_YEAR as FISCAL_YR,
+                GG.LOC_ID, GG.STUDENT_CAL_ID as CAL_ID,
+                CR.STUDENT_CRS_REQ_SCHED_STATUS as COR_REQ_STS,
+                LC.LOC_COURSE_GRADES_ISSUED as GRADES_ISSUED
+             From STUDENT_CLASS GG
+             Join LOCATION_COURSE_CATALOG LC
+               on  LC.LOC_ID = GG.LOC_ID
+               and LC.DIST_COURSE_FISCAL_YEAR = GG.DIST_COURSE_FISCAL_YEAR
+               and LC.STUDENT_CAL_ID = GG.STUDENT_CAL_ID
+               and LC.DIST_COURSE_ID = GG.DIST_COURSE_ID
+             Join STUDENT_COURSE_REQUEST CR
+               on CR.STUDENT_CRS_REQ_ID = GG.STUDENT_CRS_REQ_ID
+             ) SC
+    on  SC.FISCAL_YR = ST.FY
+    and SC.LOC_ID = ST.LOC_ID
+    and SC.CAL_ID = ST.CAL_ID
+    and SC.PER_ID = ST.PER_ID
+    and SC.STU_GRD_GROUP_ID = GV.STU_GRD_GROUP_ID
+  
+  Left Join V_C_STU_DISTRICT_COURSE DC
+    on  DC.DIST_COURSE_FISCAL_YEAR = ST.FY
+    and DC.DIST_COURSE_ID = GV.DIST_COURSE_ID
+
+Where ST.RANDOM_NUMBER = v_Random_Number
+;
+
+
+--############################################################################## 
+-- If Requested to Only Consider Core Subject(s), Then Mark Non Core as Excluded
+-- Similarly, ignore (or not) Dual Credit Courses as prompted
+--############################################################################## 
+--  v_Subject       -- All/All Core/ELA/MTH/SCI/SOC
+--  COURSE_CORE     -- Y/N
+--  COURSE_SUBJECT  -- ELA/MTH/SCI/SCO
+
+Update SESSION_CUST_RPT_FAILURE_STATS_GRADES GR
+  Set GR.GRADE_INCLUDED = 'N'
+Where v_Subject = 'ALL CORE' and GR.COURSE_CORE = 'N'
+  and GR.RANDOM_NUMBER = v_Random_Number
+;
+
+Update SESSION_CUST_RPT_FAILURE_STATS_GRADES GR
+  Set GR.GRADE_INCLUDED = 'N'
+Where v_Subject in ('ELA','MTH','SCI','SOC') and GR.COURSE_SUBJECT <> v_Subject
+  and GR.RANDOM_NUMBER = v_Random_Number
+;
+
+Update SESSION_CUST_RPT_FAILURE_STATS_GRADES GR
+  Set GR.GRADE_INCLUDED = 'N'
+Where v_Subject in ('ELA','MTH','SCI','SOC') and GR.COURSE_SUBJECT <> v_Subject
+  and GR.RANDOM_NUMBER = v_Random_Number
+;
+
+
+--  v_Dual_Credit   -- Y/N/ONLY
+--  DUAL_CREDIT     -- Y/N
+
+Update SESSION_CUST_RPT_FAILURE_STATS_GRADES GR
+  Set GR.GRADE_INCLUDED = 'N'
+Where v_Dual_Credit = 'N' and GR.DUAL_CREDIT = 'Y'
+  and GR.RANDOM_NUMBER = v_Random_Number
+;
+
+Update SESSION_CUST_RPT_FAILURE_STATS_GRADES GR
+  Set GR.GRADE_INCLUDED = 'N'
+Where v_Dual_Credit = 'ONLY' and GR.DUAL_CREDIT = 'N'
+  and GR.RANDOM_NUMBER = v_Random_Number
+;
+
+
+--############################################################################## 
+-- Update Base Student Table with Number of Failing Grades from Grades Table
+--############################################################################## 
+
+Update SESSION_CUST_RPT_FAILURE_STATS_STU ST
+  Set ST.NBR_FAILING_GRADES = (Select Sum(GR.GRADE_FAILING)
+                               From SESSION_CUST_RPT_FAILURE_STATS_GRADES GR
+                               Where GR.FY = ST.FY
+                                 and GR.LOC_ID = ST.LOC_ID
+                                 and GR.CAL_ID = ST.CAL_ID
+                                 and GR.PER_ID = ST.PER_ID
+                                 and GR.GRADE_INCLUDED = 'Y'
+                                 and GR.RANDOM_NUMBER = v_Random_Number
+                               )
+Where ST.RANDOM_NUMBER = v_Random_Number
+;
+
+Update SESSION_CUST_RPT_FAILURE_STATS_STU ST
+  Set ST.NBR_FAILING_GRADES = 0
+Where ST.NBR_FAILING_GRADES is Null
+  and ST.RANDOM_NUMBER = v_Random_Number
+;
+
+
+--############################################################################## 
+-- Prepare Raw Stats
+--############################################################################## 
+
+-- Build Campus(es) Data, combined grade level
+Insert into SESSION_CUST_RPT_FAILURE_STATS_RAW
+  Select
+    ST.RANDOM_NUMBER,
+    ST.BUILD_TS,
+    ST.FY,
+    ST.LOC_ID,
+    ST.LOC_NAME,
+    ST.AS_OF_DATE,
+    ST.GRADE_TYPE_NAME,
+    '' as GRADE,
+
+    Sum(ST.ENR_STU) as ENR_STU,
+    Sum(Case When ST.NBR_FAILING_GRADES > 0 Then 1 Else 0 End) as ENR_STU_FAILING,
+     Sum(Case When ST.NBR_FAILING_GRADES = 1 Then 1 Else 0 End) as ENR_STU_FAILING1,
+     Sum(Case When ST.NBR_FAILING_GRADES > 1 Then 1 Else 0 End) as ENR_STU_FAILING2P,
+    
+    Sum(ST.L@H) as L@H,
+    Sum(Case When ST.L@H = 1 and ST.NBR_FAILING_GRADES > 0 Then 1 Else 0 End) as L@H_FAILING,
+     Sum(Case When ST.L@H = 1 and ST.NBR_FAILING_GRADES = 1 Then 1 Else 0 End) as L@H_FAILING1,
+     Sum(Case When ST.L@H = 1 and ST.NBR_FAILING_GRADES > 1 Then 1 Else 0 End) as L@H_FAILING2P,
+
+    Sum(ST.L@S) as L@S,
+    Sum(Case When ST.L@S = 1 and ST.NBR_FAILING_GRADES > 0 Then 1 Else 0 End) as L@S_FAILING,
+     Sum(Case When ST.L@S = 1 and ST.NBR_FAILING_GRADES = 1 Then 1 Else 0 End) as L@S_FAILING1,
+     Sum(Case When ST.L@S = 1 and ST.NBR_FAILING_GRADES > 1 Then 1 Else 0 End) as L@S_FAILING2P,
+
+    Sum(ST.NON_UIL_STU) as NON_UIL_STU,
+    Sum(Case When ST.NON_UIL_STU = 1 and ST.NBR_FAILING_GRADES > 0 Then 1 Else 0 End) as NON_UIL_STU_FAILING,
+     Sum(Case When ST.NON_UIL_STU = 1 and ST.NBR_FAILING_GRADES = 1 Then 1 Else 0 End) as NON_UIL_STU_FAILING1,
+     Sum(Case When ST.NON_UIL_STU = 1 and ST.NBR_FAILING_GRADES > 1 Then 1 Else 0 End) as NON_UIL_STU_FAILING2P,
+
+    Sum(ST.UIL_STU) as UIL_STU,
+    Sum(Case When ST.UIL_STU = 1 and ST.NBR_FAILING_GRADES > 0 Then 1 Else 0 End) as UIL_STU_FAILING,
+     Sum(Case When ST.UIL_STU = 1 and ST.NBR_FAILING_GRADES = 1 Then 1 Else 0 End) as UIL_STU_FAILING1,
+     Sum(Case When ST.UIL_STU = 1 and ST.NBR_FAILING_GRADES > 1 Then 1 Else 0 End) as UIL_STU_FAILING2P,
+
+    Sum(ST.LEP) as LEP,
+    Sum(Case When ST.LEP = 1 and ST.NBR_FAILING_GRADES > 0 Then 1 Else 0 End) as LEP_FAILING,
+     Sum(Case When ST.LEP = 1 and ST.NBR_FAILING_GRADES = 1 Then 1 Else 0 End) as LEP_FAILING1,
+     Sum(Case When ST.LEP = 1 and ST.NBR_FAILING_GRADES > 1 Then 1 Else 0 End) as LEP_FAILING2P,
+
+    Sum(ST.NON_LEP) as NON_LEP,
+    Sum(Case When ST.NON_LEP = 1 and ST.NBR_FAILING_GRADES > 0 Then 1 Else 0 End) as NON_LEP_FAILING,
+     Sum(Case When ST.NON_LEP = 1 and ST.NBR_FAILING_GRADES = 1 Then 1 Else 0 End) as NON_LEP_FAILING1,
+     Sum(Case When ST.NON_LEP = 1 and ST.NBR_FAILING_GRADES > 1 Then 1 Else 0 End) as NON_LEP_FAILING2P,
+
+    Sum(ST.AFRICAN_AM) as AFRICAN_AM,
+    Sum(Case When ST.AFRICAN_AM = 1 and ST.NBR_FAILING_GRADES > 0 Then 1 Else 0 End) as AFRICAN_AM_FAILING,
+     Sum(Case When ST.AFRICAN_AM = 1 and ST.NBR_FAILING_GRADES = 1 Then 1 Else 0 End) as AFRICAN_AM_FAILING1,
+     Sum(Case When ST.AFRICAN_AM = 1 and ST.NBR_FAILING_GRADES > 1 Then 1 Else 0 End) as AFRICAN_AM_FAILING2P,
+
+    Sum(ST.HISPANIC) as HISPANIC,
+    Sum(Case When ST.HISPANIC = 1 and ST.NBR_FAILING_GRADES > 0 Then 1 Else 0 End) as HISPANIC_FAILING,
+     Sum(Case When ST.HISPANIC = 1 and ST.NBR_FAILING_GRADES = 1 Then 1 Else 0 End) as HISPANIC_FAILING1,
+     Sum(Case When ST.HISPANIC = 1 and ST.NBR_FAILING_GRADES > 1 Then 1 Else 0 End) as HISPANIC_FAILING2P,
+
+    Sum(ST.WHITE) as WHITE,
+    Sum(Case When ST.WHITE = 1 and ST.NBR_FAILING_GRADES > 0 Then 1 Else 0 End) as WHITE_FAILING,
+     Sum(Case When ST.WHITE = 1 and ST.NBR_FAILING_GRADES = 1 Then 1 Else 0 End) as WHITE_FAILING1,
+     Sum(Case When ST.WHITE = 1 and ST.NBR_FAILING_GRADES > 1 Then 1 Else 0 End) as WHITE_FAILING2P,
+
+    Sum(ST.OTHER_ETH) as OTHER_ETH,
+    Sum(Case When ST.OTHER_ETH = 1 and ST.NBR_FAILING_GRADES > 0 Then 1 Else 0 End) as OTHER_ETH_FAILING,
+     Sum(Case When ST.OTHER_ETH = 1 and ST.NBR_FAILING_GRADES = 1 Then 1 Else 0 End) as OTHER_ETH_FAILING1,
+     Sum(Case When ST.OTHER_ETH = 1 and ST.NBR_FAILING_GRADES > 1 Then 1 Else 0 End) as OTHER_ETH_FAILING2P,
+
+    Sum(ST.MALE) as MALE,
+    Sum(Case When ST.MALE = 1 and ST.NBR_FAILING_GRADES > 0 Then 1 Else 0 End) as MALE_FAILING,
+     Sum(Case When ST.MALE = 1 and ST.NBR_FAILING_GRADES = 1 Then 1 Else 0 End) as MALE_FAILING1,
+     Sum(Case When ST.MALE = 1 and ST.NBR_FAILING_GRADES > 1 Then 1 Else 0 End) as MALE_FAILING2P,
+
+    Sum(ST.FEMALE) as FEMALE,
+    Sum(Case When ST.FEMALE = 1 and ST.NBR_FAILING_GRADES > 0 Then 1 Else 0 End) as FEMALE_FAILING,
+     Sum(Case When ST.FEMALE = 1 and ST.NBR_FAILING_GRADES = 1 Then 1 Else 0 End) as FEMALE_FAILING1,
+     Sum(Case When ST.FEMALE = 1 and ST.NBR_FAILING_GRADES > 1 Then 1 Else 0 End) as FEMALE_FAILING2P
+
+  From SESSION_CUST_RPT_FAILURE_STATS_STU ST
+
+  Where ST.RANDOM_NUMBER = v_Random_Number
+  
+  Group By ST.RANDOM_NUMBER, ST.BUILD_TS, ST.FY, ST.LOC_ID, ST.LOC_NAME, ST.AS_OF_DATE, ST.GRADE_TYPE_NAME
+;
+
+-- If Grade Level Detail Requested, Build Campus(es) Data by Grade Level
+If v_Grade_Level_Detail <> 'NO' Then 
+
+  Insert into SESSION_CUST_RPT_FAILURE_STATS_RAW
+    Select
+      ST.RANDOM_NUMBER,
+      ST.BUILD_TS,
+      ST.FY,
+      ST.LOC_ID,
+      ST.LOC_NAME,
+      ST.AS_OF_DATE,
+      ST.GRADE_TYPE_NAME,
+      ST.GRADE,
+  
+      Sum(ST.ENR_STU) as ENR_STU,
+      Sum(Case When ST.NBR_FAILING_GRADES > 0 Then 1 Else 0 End) as ENR_STU_FAILING,
+       Sum(Case When ST.NBR_FAILING_GRADES = 1 Then 1 Else 0 End) as ENR_STU_FAILING1,
+       Sum(Case When ST.NBR_FAILING_GRADES > 1 Then 1 Else 0 End) as ENR_STU_FAILING2P,
+      
+      Sum(ST.L@H) as L@H,
+      Sum(Case When ST.L@H = 1 and ST.NBR_FAILING_GRADES > 0 Then 1 Else 0 End) as L@H_FAILING,
+       Sum(Case When ST.L@H = 1 and ST.NBR_FAILING_GRADES = 1 Then 1 Else 0 End) as L@H_FAILING1,
+       Sum(Case When ST.L@H = 1 and ST.NBR_FAILING_GRADES > 1 Then 1 Else 0 End) as L@H_FAILING2P,
+  
+      Sum(ST.L@S) as L@S,
+      Sum(Case When ST.L@S = 1 and ST.NBR_FAILING_GRADES > 0 Then 1 Else 0 End) as L@S_FAILING,
+       Sum(Case When ST.L@S = 1 and ST.NBR_FAILING_GRADES = 1 Then 1 Else 0 End) as L@S_FAILING1,
+       Sum(Case When ST.L@S = 1 and ST.NBR_FAILING_GRADES > 1 Then 1 Else 0 End) as L@S_FAILING2P,
+  
+      Sum(ST.NON_UIL_STU) as NON_UIL_STU,
+      Sum(Case When ST.NON_UIL_STU = 1 and ST.NBR_FAILING_GRADES > 0 Then 1 Else 0 End) as NON_UIL_STU_FAILING,
+       Sum(Case When ST.NON_UIL_STU = 1 and ST.NBR_FAILING_GRADES = 1 Then 1 Else 0 End) as NON_UIL_STU_FAILING1,
+       Sum(Case When ST.NON_UIL_STU = 1 and ST.NBR_FAILING_GRADES > 1 Then 1 Else 0 End) as NON_UIL_STU_FAILING2P,
+  
+      Sum(ST.UIL_STU) as UIL_STU,
+      Sum(Case When ST.UIL_STU = 1 and ST.NBR_FAILING_GRADES > 0 Then 1 Else 0 End) as UIL_STU_FAILING,
+       Sum(Case When ST.UIL_STU = 1 and ST.NBR_FAILING_GRADES = 1 Then 1 Else 0 End) as UIL_STU_FAILING1,
+       Sum(Case When ST.UIL_STU = 1 and ST.NBR_FAILING_GRADES > 1 Then 1 Else 0 End) as UIL_STU_FAILING2P,
+  
+      Sum(ST.LEP) as LEP,
+      Sum(Case When ST.LEP = 1 and ST.NBR_FAILING_GRADES > 0 Then 1 Else 0 End) as LEP_FAILING,
+       Sum(Case When ST.LEP = 1 and ST.NBR_FAILING_GRADES = 1 Then 1 Else 0 End) as LEP_FAILING1,
+       Sum(Case When ST.LEP = 1 and ST.NBR_FAILING_GRADES > 1 Then 1 Else 0 End) as LEP_FAILING2P,
+  
+      Sum(ST.NON_LEP) as NON_LEP,
+      Sum(Case When ST.NON_LEP = 1 and ST.NBR_FAILING_GRADES > 0 Then 1 Else 0 End) as NON_LEP_FAILING,
+       Sum(Case When ST.NON_LEP = 1 and ST.NBR_FAILING_GRADES = 1 Then 1 Else 0 End) as NON_LEP_FAILING1,
+       Sum(Case When ST.NON_LEP = 1 and ST.NBR_FAILING_GRADES > 1 Then 1 Else 0 End) as NON_LEP_FAILING2P,
+  
+      Sum(ST.AFRICAN_AM) as AFRICAN_AM,
+      Sum(Case When ST.AFRICAN_AM = 1 and ST.NBR_FAILING_GRADES > 0 Then 1 Else 0 End) as AFRICAN_AM_FAILING,
+       Sum(Case When ST.AFRICAN_AM = 1 and ST.NBR_FAILING_GRADES = 1 Then 1 Else 0 End) as AFRICAN_AM_FAILING1,
+       Sum(Case When ST.AFRICAN_AM = 1 and ST.NBR_FAILING_GRADES > 1 Then 1 Else 0 End) as AFRICAN_AM_FAILING2P,
+  
+      Sum(ST.HISPANIC) as HISPANIC,
+      Sum(Case When ST.HISPANIC = 1 and ST.NBR_FAILING_GRADES > 0 Then 1 Else 0 End) as HISPANIC_FAILING,
+       Sum(Case When ST.HISPANIC = 1 and ST.NBR_FAILING_GRADES = 1 Then 1 Else 0 End) as HISPANIC_FAILING1,
+       Sum(Case When ST.HISPANIC = 1 and ST.NBR_FAILING_GRADES > 1 Then 1 Else 0 End) as HISPANIC_FAILING2P,
+  
+      Sum(ST.WHITE) as WHITE,
+      Sum(Case When ST.WHITE = 1 and ST.NBR_FAILING_GRADES > 0 Then 1 Else 0 End) as WHITE_FAILING,
+       Sum(Case When ST.WHITE = 1 and ST.NBR_FAILING_GRADES = 1 Then 1 Else 0 End) as WHITE_FAILING1,
+       Sum(Case When ST.WHITE = 1 and ST.NBR_FAILING_GRADES > 1 Then 1 Else 0 End) as WHITE_FAILING2P,
+  
+      Sum(ST.OTHER_ETH) as OTHER_ETH,
+      Sum(Case When ST.OTHER_ETH = 1 and ST.NBR_FAILING_GRADES > 0 Then 1 Else 0 End) as OTHER_ETH_FAILING,
+       Sum(Case When ST.OTHER_ETH = 1 and ST.NBR_FAILING_GRADES = 1 Then 1 Else 0 End) as OTHER_ETH_FAILING1,
+       Sum(Case When ST.OTHER_ETH = 1 and ST.NBR_FAILING_GRADES > 1 Then 1 Else 0 End) as OTHER_ETH_FAILING2P,
+  
+      Sum(ST.MALE) as MALE,
+      Sum(Case When ST.MALE = 1 and ST.NBR_FAILING_GRADES > 0 Then 1 Else 0 End) as MALE_FAILING,
+       Sum(Case When ST.MALE = 1 and ST.NBR_FAILING_GRADES = 1 Then 1 Else 0 End) as MALE_FAILING1,
+       Sum(Case When ST.MALE = 1 and ST.NBR_FAILING_GRADES > 1 Then 1 Else 0 End) as MALE_FAILING2P,
+  
+      Sum(ST.FEMALE) as FEMALE,
+      Sum(Case When ST.FEMALE = 1 and ST.NBR_FAILING_GRADES > 0 Then 1 Else 0 End) as FEMALE_FAILING,
+       Sum(Case When ST.FEMALE = 1 and ST.NBR_FAILING_GRADES = 1 Then 1 Else 0 End) as FEMALE_FAILING1,
+       Sum(Case When ST.FEMALE = 1 and ST.NBR_FAILING_GRADES > 1 Then 1 Else 0 End) as FEMALE_FAILING2P
+  
+    From SESSION_CUST_RPT_FAILURE_STATS_STU ST
+  
+    Where ST.RANDOM_NUMBER = v_Random_Number
+    
+    Group By ST.RANDOM_NUMBER, ST.BUILD_TS, ST.FY, ST.LOC_ID, ST.LOC_NAME, ST.AS_OF_DATE, ST.GRADE_TYPE_NAME, ST.GRADE
+  ;
+End If;
+
+-- ........................................................................
+--
+-- ........................................................................
+-- Build District Summary Without Regard to Grade Level
+If v_District_Summary = 'Y' Then 
+
+  Insert into SESSION_CUST_RPT_FAILURE_STATS_RAW
+    Select
+      ST.RANDOM_NUMBER,
+      ST.BUILD_TS,
+      ST.FY,
+      '999' as LOC_ID,
+      'Tyler ISD' as LOC_NAME,
+      ST.AS_OF_DATE,
+      ST.GRADE_TYPE_NAME,
+      '' as GRADE,
+      
+      Sum(ST.ENR_STU) as ENR_STU,
+      Sum(Case When ST.NBR_FAILING_GRADES > 0 Then 1 Else 0 End) as ENR_STU_FAILING,
+       Sum(Case When ST.NBR_FAILING_GRADES = 1 Then 1 Else 0 End) as ENR_STU_FAILING1,
+       Sum(Case When ST.NBR_FAILING_GRADES > 1 Then 1 Else 0 End) as ENR_STU_FAILING2P,
+      
+      Sum(ST.L@H) as L@H,
+      Sum(Case When ST.L@H = 1 and ST.NBR_FAILING_GRADES > 0 Then 1 Else 0 End) as L@H_FAILING,
+       Sum(Case When ST.L@H = 1 and ST.NBR_FAILING_GRADES = 1 Then 1 Else 0 End) as L@H_FAILING1,
+       Sum(Case When ST.L@H = 1 and ST.NBR_FAILING_GRADES > 1 Then 1 Else 0 End) as L@H_FAILING2P,
+
+      Sum(ST.L@S) as L@S,
+      Sum(Case When ST.L@S = 1 and ST.NBR_FAILING_GRADES > 0 Then 1 Else 0 End) as L@S_FAILING,
+       Sum(Case When ST.L@S = 1 and ST.NBR_FAILING_GRADES = 1 Then 1 Else 0 End) as L@S_FAILING1,
+       Sum(Case When ST.L@S = 1 and ST.NBR_FAILING_GRADES > 1 Then 1 Else 0 End) as L@S_FAILING2P,
+
+      Sum(ST.NON_UIL_STU) as NON_UIL_STU,
+      Sum(Case When ST.NON_UIL_STU = 1 and ST.NBR_FAILING_GRADES > 0 Then 1 Else 0 End) as NON_UIL_STU_FAILING,
+       Sum(Case When ST.NON_UIL_STU = 1 and ST.NBR_FAILING_GRADES = 1 Then 1 Else 0 End) as NON_UIL_STU_FAILING1,
+       Sum(Case When ST.NON_UIL_STU = 1 and ST.NBR_FAILING_GRADES > 1 Then 1 Else 0 End) as NON_UIL_STU_FAILING2P,
+
+      Sum(ST.UIL_STU) as UIL_STU,
+      Sum(Case When ST.UIL_STU = 1 and ST.NBR_FAILING_GRADES > 0 Then 1 Else 0 End) as UIL_STU_FAILING,
+       Sum(Case When ST.UIL_STU = 1 and ST.NBR_FAILING_GRADES = 1 Then 1 Else 0 End) as UIL_STU_FAILING1,
+       Sum(Case When ST.UIL_STU = 1 and ST.NBR_FAILING_GRADES > 1 Then 1 Else 0 End) as UIL_STU_FAILING2P,
+
+      Sum(ST.LEP) as LEP,
+      Sum(Case When ST.LEP = 1 and ST.NBR_FAILING_GRADES > 0 Then 1 Else 0 End) as LEP_FAILING,
+       Sum(Case When ST.LEP = 1 and ST.NBR_FAILING_GRADES = 1 Then 1 Else 0 End) as LEP_FAILING1,
+       Sum(Case When ST.LEP = 1 and ST.NBR_FAILING_GRADES > 1 Then 1 Else 0 End) as LEP_FAILING2P,
+
+      Sum(ST.NON_LEP) as NON_LEP,
+      Sum(Case When ST.NON_LEP = 1 and ST.NBR_FAILING_GRADES > 0 Then 1 Else 0 End) as NON_LEP_FAILING,
+       Sum(Case When ST.NON_LEP = 1 and ST.NBR_FAILING_GRADES = 1 Then 1 Else 0 End) as NON_LEP_FAILING1,
+       Sum(Case When ST.NON_LEP = 1 and ST.NBR_FAILING_GRADES > 1 Then 1 Else 0 End) as NON_LEP_FAILING2P,
+
+      Sum(ST.AFRICAN_AM) as AFRICAN_AM,
+      Sum(Case When ST.AFRICAN_AM = 1 and ST.NBR_FAILING_GRADES > 0 Then 1 Else 0 End) as AFRICAN_AM_FAILING,
+       Sum(Case When ST.AFRICAN_AM = 1 and ST.NBR_FAILING_GRADES = 1 Then 1 Else 0 End) as AFRICAN_AM_FAILING1,
+       Sum(Case When ST.AFRICAN_AM = 1 and ST.NBR_FAILING_GRADES > 1 Then 1 Else 0 End) as AFRICAN_AM_FAILING2P,
+
+      Sum(ST.HISPANIC) as HISPANIC,
+      Sum(Case When ST.HISPANIC = 1 and ST.NBR_FAILING_GRADES > 0 Then 1 Else 0 End) as HISPANIC_FAILING,
+       Sum(Case When ST.HISPANIC = 1 and ST.NBR_FAILING_GRADES = 1 Then 1 Else 0 End) as HISPANIC_FAILING1,
+       Sum(Case When ST.HISPANIC = 1 and ST.NBR_FAILING_GRADES > 1 Then 1 Else 0 End) as HISPANIC_FAILING2P,
+
+      Sum(ST.WHITE) as WHITE,
+      Sum(Case When ST.WHITE = 1 and ST.NBR_FAILING_GRADES > 0 Then 1 Else 0 End) as WHITE_FAILING,
+       Sum(Case When ST.WHITE = 1 and ST.NBR_FAILING_GRADES = 1 Then 1 Else 0 End) as WHITE_FAILING1,
+       Sum(Case When ST.WHITE = 1 and ST.NBR_FAILING_GRADES > 1 Then 1 Else 0 End) as WHITE_FAILING2P,
+
+      Sum(ST.OTHER_ETH) as OTHER_ETH,
+      Sum(Case When ST.OTHER_ETH = 1 and ST.NBR_FAILING_GRADES > 0 Then 1 Else 0 End) as OTHER_ETH_FAILING,
+       Sum(Case When ST.OTHER_ETH = 1 and ST.NBR_FAILING_GRADES = 1 Then 1 Else 0 End) as OTHER_ETH_FAILING1,
+       Sum(Case When ST.OTHER_ETH = 1 and ST.NBR_FAILING_GRADES > 1 Then 1 Else 0 End) as OTHER_ETH_FAILING2P,
+
+      Sum(ST.MALE) as MALE,
+      Sum(Case When ST.MALE = 1 and ST.NBR_FAILING_GRADES > 0 Then 1 Else 0 End) as MALE_FAILING,
+       Sum(Case When ST.MALE = 1 and ST.NBR_FAILING_GRADES = 1 Then 1 Else 0 End) as MALE_FAILING1,
+       Sum(Case When ST.MALE = 1 and ST.NBR_FAILING_GRADES > 1 Then 1 Else 0 End) as MALE_FAILING2P,
+
+      Sum(ST.FEMALE) as FEMALE,
+      Sum(Case When ST.FEMALE = 1 and ST.NBR_FAILING_GRADES > 0 Then 1 Else 0 End) as FEMALE_FAILING,
+       Sum(Case When ST.FEMALE = 1 and ST.NBR_FAILING_GRADES = 1 Then 1 Else 0 End) as FEMALE_FAILING1,
+       Sum(Case When ST.FEMALE = 1 and ST.NBR_FAILING_GRADES > 1 Then 1 Else 0 End) as FEMALE_FAILING2P
+    
+    From SESSION_CUST_RPT_FAILURE_STATS_STU ST
+
+    Where ST.RANDOM_NUMBER = v_Random_Number
+
+    Group By ST.RANDOM_NUMBER, ST.BUILD_TS, ST.FY, ST.AS_OF_DATE, ST.GRADE_TYPE_NAME
+  ;
+
+
+  -- If Grade Level Detail Requested, Build Campus(es) Data by Grade Level
+  If v_Grade_Level_Detail <> 'NO' Then 
+
+    Insert into SESSION_CUST_RPT_FAILURE_STATS_RAW
+      Select
+        ST.RANDOM_NUMBER,
+        ST.BUILD_TS,
+        ST.FY,
+        '999' as LOC_ID,
+        'Tyler ISD' as LOC_NAME,
+        ST.AS_OF_DATE,
+        ST.GRADE_TYPE_NAME,
+        ST.GRADE,
+        
+        Sum(ST.ENR_STU) as ENR_STU,
+        Sum(Case When ST.NBR_FAILING_GRADES > 0 Then 1 Else 0 End) as ENR_STU_FAILING,
+         Sum(Case When ST.NBR_FAILING_GRADES = 1 Then 1 Else 0 End) as ENR_STU_FAILING1,
+         Sum(Case When ST.NBR_FAILING_GRADES > 1 Then 1 Else 0 End) as ENR_STU_FAILING2P,
+        
+        Sum(ST.L@H) as L@H,
+        Sum(Case When ST.L@H = 1 and ST.NBR_FAILING_GRADES > 0 Then 1 Else 0 End) as L@H_FAILING,
+         Sum(Case When ST.L@H = 1 and ST.NBR_FAILING_GRADES = 1 Then 1 Else 0 End) as L@H_FAILING1,
+         Sum(Case When ST.L@H = 1 and ST.NBR_FAILING_GRADES > 1 Then 1 Else 0 End) as L@H_FAILING2P,
+  
+        Sum(ST.L@S) as L@S,
+        Sum(Case When ST.L@S = 1 and ST.NBR_FAILING_GRADES > 0 Then 1 Else 0 End) as L@S_FAILING,
+         Sum(Case When ST.L@S = 1 and ST.NBR_FAILING_GRADES = 1 Then 1 Else 0 End) as L@S_FAILING1,
+         Sum(Case When ST.L@S = 1 and ST.NBR_FAILING_GRADES > 1 Then 1 Else 0 End) as L@S_FAILING2P,
+  
+        Sum(ST.NON_UIL_STU) as NON_UIL_STU,
+        Sum(Case When ST.NON_UIL_STU = 1 and ST.NBR_FAILING_GRADES > 0 Then 1 Else 0 End) as NON_UIL_STU_FAILING,
+         Sum(Case When ST.NON_UIL_STU = 1 and ST.NBR_FAILING_GRADES = 1 Then 1 Else 0 End) as NON_UIL_STU_FAILING1,
+         Sum(Case When ST.NON_UIL_STU = 1 and ST.NBR_FAILING_GRADES > 1 Then 1 Else 0 End) as NON_UIL_STU_FAILING2P,
+  
+        Sum(ST.UIL_STU) as UIL_STU,
+        Sum(Case When ST.UIL_STU = 1 and ST.NBR_FAILING_GRADES > 0 Then 1 Else 0 End) as UIL_STU_FAILING,
+         Sum(Case When ST.UIL_STU = 1 and ST.NBR_FAILING_GRADES = 1 Then 1 Else 0 End) as UIL_STU_FAILING1,
+         Sum(Case When ST.UIL_STU = 1 and ST.NBR_FAILING_GRADES > 1 Then 1 Else 0 End) as UIL_STU_FAILING2P,
+  
+        Sum(ST.LEP) as LEP,
+        Sum(Case When ST.LEP = 1 and ST.NBR_FAILING_GRADES > 0 Then 1 Else 0 End) as LEP_FAILING,
+         Sum(Case When ST.LEP = 1 and ST.NBR_FAILING_GRADES = 1 Then 1 Else 0 End) as LEP_FAILING1,
+         Sum(Case When ST.LEP = 1 and ST.NBR_FAILING_GRADES > 1 Then 1 Else 0 End) as LEP_FAILING2P,
+  
+        Sum(ST.NON_LEP) as NON_LEP,
+        Sum(Case When ST.NON_LEP = 1 and ST.NBR_FAILING_GRADES > 0 Then 1 Else 0 End) as NON_LEP_FAILING,
+         Sum(Case When ST.NON_LEP = 1 and ST.NBR_FAILING_GRADES = 1 Then 1 Else 0 End) as NON_LEP_FAILING1,
+         Sum(Case When ST.NON_LEP = 1 and ST.NBR_FAILING_GRADES > 1 Then 1 Else 0 End) as NON_LEP_FAILING2P,
+  
+        Sum(ST.AFRICAN_AM) as AFRICAN_AM,
+        Sum(Case When ST.AFRICAN_AM = 1 and ST.NBR_FAILING_GRADES > 0 Then 1 Else 0 End) as AFRICAN_AM_FAILING,
+         Sum(Case When ST.AFRICAN_AM = 1 and ST.NBR_FAILING_GRADES = 1 Then 1 Else 0 End) as AFRICAN_AM_FAILING1,
+         Sum(Case When ST.AFRICAN_AM = 1 and ST.NBR_FAILING_GRADES > 1 Then 1 Else 0 End) as AFRICAN_AM_FAILING2P,
+  
+        Sum(ST.HISPANIC) as HISPANIC,
+        Sum(Case When ST.HISPANIC = 1 and ST.NBR_FAILING_GRADES > 0 Then 1 Else 0 End) as HISPANIC_FAILING,
+         Sum(Case When ST.HISPANIC = 1 and ST.NBR_FAILING_GRADES = 1 Then 1 Else 0 End) as HISPANIC_FAILING1,
+         Sum(Case When ST.HISPANIC = 1 and ST.NBR_FAILING_GRADES > 1 Then 1 Else 0 End) as HISPANIC_FAILING2P,
+  
+        Sum(ST.WHITE) as WHITE,
+        Sum(Case When ST.WHITE = 1 and ST.NBR_FAILING_GRADES > 0 Then 1 Else 0 End) as WHITE_FAILING,
+         Sum(Case When ST.WHITE = 1 and ST.NBR_FAILING_GRADES = 1 Then 1 Else 0 End) as WHITE_FAILING1,
+         Sum(Case When ST.WHITE = 1 and ST.NBR_FAILING_GRADES > 1 Then 1 Else 0 End) as WHITE_FAILING2P,
+  
+        Sum(ST.OTHER_ETH) as OTHER_ETH,
+        Sum(Case When ST.OTHER_ETH = 1 and ST.NBR_FAILING_GRADES > 0 Then 1 Else 0 End) as OTHER_ETH_FAILING,
+         Sum(Case When ST.OTHER_ETH = 1 and ST.NBR_FAILING_GRADES = 1 Then 1 Else 0 End) as OTHER_ETH_FAILING1,
+         Sum(Case When ST.OTHER_ETH = 1 and ST.NBR_FAILING_GRADES > 1 Then 1 Else 0 End) as OTHER_ETH_FAILING2P,
+  
+        Sum(ST.MALE) as MALE,
+        Sum(Case When ST.MALE = 1 and ST.NBR_FAILING_GRADES > 0 Then 1 Else 0 End) as MALE_FAILING,
+         Sum(Case When ST.MALE = 1 and ST.NBR_FAILING_GRADES = 1 Then 1 Else 0 End) as MALE_FAILING1,
+         Sum(Case When ST.MALE = 1 and ST.NBR_FAILING_GRADES > 1 Then 1 Else 0 End) as MALE_FAILING2P,
+  
+        Sum(ST.FEMALE) as FEMALE,
+        Sum(Case When ST.FEMALE = 1 and ST.NBR_FAILING_GRADES > 0 Then 1 Else 0 End) as FEMALE_FAILING,
+         Sum(Case When ST.FEMALE = 1 and ST.NBR_FAILING_GRADES = 1 Then 1 Else 0 End) as FEMALE_FAILING1,
+         Sum(Case When ST.FEMALE = 1 and ST.NBR_FAILING_GRADES > 1 Then 1 Else 0 End) as FEMALE_FAILING2P
+      
+      From SESSION_CUST_RPT_FAILURE_STATS_STU ST
+  
+      Where ST.RANDOM_NUMBER = v_Random_Number
+  
+      Group By ST.RANDOM_NUMBER, ST.BUILD_TS, ST.FY, ST.AS_OF_DATE, ST.GRADE_TYPE_NAME, ST.GRADE
+    ;
+
+
+  End If;
+
+End If;
+
+--############################################################################## 
+-- 
+--############################################################################## 
+
+-- Set N for First Pass to Get School Totals, whether or not we will also do Grade Level Detail
+Set v_Rpt_By_Grade = 'N';
+
+-- ........................................................................
+--  The following is Exactly the same code that will be executed a second
+--  time immediately afterward.  This block build the School Totals.
+--  The second (exact same) block, will only execute if Grade Level Detail
+--  was set to Yes.  That block will be executed with v_Rpt_By_Grade = Y.
+--  If you make changes to this block, you should COPY EXACTLY the block
+--  and paste over the block below (leaving the IF and SET statements.
+-- ........................................................................
+Insert into SESSION_CUST_RPT_FAILURE_STATS_ROWS
+  Select
+    RS.RANDOM_NUMBER,
+    RS.BUILD_TS,
+    RS.FY,
+    RS.LOC_ID,
+    RS.LOC_NAME,
+    RS.AS_OF_DATE,
+    RS.GRADE,
+    RS.GRADE_TYPE_NAME,
+    v_Grade_From_Char as RPT_GRADE_FROM,
+    v_Grade_Thru_Char as RPT_GRADE_THRU,
+    p_Subject         as RPT_SUBJECT,
+    v_Dual_Credit     as RPT_DUAL_CREDIT,
+    Case When RS.GRADE <> '' Then 'All Students Grade ' || RS.GRADE Else 'All Students' End as ROW_TITLE,
+    1 as ROW_SORT,
+    1 as LINE_GROUP,
+    RS.ENR_STU_FAILING as FAILING_STU,
+    RS.ENR_STU_FAILING1 as FAILING_STU1,
+    RS.ENR_STU_FAILING2P as FAILING_STU2P,
+    RS.ENR_STU as TOTAL_STU,
+    Case When RS.ENR_STU = 0 Then 0 Else Decimal(((RS.ENR_STU_FAILING   / RS.ENR_STU) * 100),12,2)  End as FAILING_PCT,
+    Case When RS.ENR_STU = 0 Then 0 Else Decimal(((RS.ENR_STU_FAILING1  / RS.ENR_STU) * 100),12,2)  End as FAILING_PCT1,
+    Case When RS.ENR_STU = 0 Then 0 Else Decimal(((RS.ENR_STU_FAILING2P / RS.ENR_STU) * 100),12,2)  End as FAILING_PCT2P
+
+  From SESSION_CUST_RPT_FAILURE_STATS_RAW RS
+
+  Where RS.RANDOM_NUMBER = v_Random_Number
+;
+-- ........................................................................
+Insert into SESSION_CUST_RPT_FAILURE_STATS_ROWS
+  Select
+    RS.RANDOM_NUMBER,
+    RS.BUILD_TS,
+    RS.FY,
+    RS.LOC_ID,
+    RS.LOC_NAME,
+    RS.AS_OF_DATE,
+    RS.GRADE,
+    RS.GRADE_TYPE_NAME,
+    v_Grade_From_Char as RPT_GRADE_FROM,
+    v_Grade_Thru_Char as RPT_GRADE_THRU,
+    p_Subject         as RPT_SUBJECT,
+    v_Dual_Credit     as RPT_DUAL_CREDIT,
+    Case When RS.GRADE <> '' Then 'Learn At Home Grade ' || RS.GRADE Else 'Learn At Home' End as ROW_TITLE,
+    2 as ROW_SORT,
+    2 as LINE_GROUP,
+    RS.L@H_FAILING as FAILING_STU,
+    RS.L@H_FAILING1 as FAILING_STU1,
+    RS.L@H_FAILING2P as FAILING_STU2P,
+    RS.L@H as TOTAL_STU,
+    Case When RS.L@H = 0 Then 0 Else Decimal(((RS.L@H_FAILING   / RS.L@H) * 100),12,2)  End as FAILING_PCT,
+    Case When RS.L@H = 0 Then 0 Else Decimal(((RS.L@H_FAILING1  / RS.L@H) * 100),12,2)  End as FAILING_PCT1,
+    Case When RS.L@H = 0 Then 0 Else Decimal(((RS.L@H_FAILING2P / RS.L@H) * 100),12,2)  End as FAILING_PCT2P
+  
+  From SESSION_CUST_RPT_FAILURE_STATS_RAW RS
+
+  Where RS.RANDOM_NUMBER = v_Random_Number
+;
+-- ........................................................................
+Insert into SESSION_CUST_RPT_FAILURE_STATS_ROWS
+  Select
+    RS.RANDOM_NUMBER,
+    RS.BUILD_TS,
+    RS.FY,
+    RS.LOC_ID,
+    RS.LOC_NAME,
+    RS.AS_OF_DATE,
+    RS.GRADE,
+    RS.GRADE_TYPE_NAME,
+    v_Grade_From_Char as RPT_GRADE_FROM,
+    v_Grade_Thru_Char as RPT_GRADE_THRU,
+    p_Subject         as RPT_SUBJECT,
+    v_Dual_Credit     as RPT_DUAL_CREDIT,
+    Case When RS.GRADE <> '' Then 'Learn At School Grade ' || RS.GRADE Else 'Learn At School' End as ROW_TITLE,
+    3 as ROW_SORT,
+    2 as LINE_GROUP,
+    RS.L@S_FAILING as FAILING_STU,
+    RS.L@S_FAILING1 as FAILING_STU1,
+    RS.L@S_FAILING2P as FAILING_STU2P,
+    RS.L@S as TOTAL_STU,
+    Case When RS.L@S = 0 Then 0 Else Decimal(((RS.L@S_FAILING   / RS.L@S) * 100),12,2)  End as FAILING_PCT,
+    Case When RS.L@S = 0 Then 0 Else Decimal(((RS.L@S_FAILING1  / RS.L@S) * 100),12,2)  End as FAILING_PCT1,
+    Case When RS.L@S = 0 Then 0 Else Decimal(((RS.L@S_FAILING2P / RS.L@S) * 100),12,2)  End as FAILING_PCT2P
+  
+  From SESSION_CUST_RPT_FAILURE_STATS_RAW RS
+
+  Where RS.RANDOM_NUMBER = v_Random_Number
+;
+-- ........................................................................
+Insert into SESSION_CUST_RPT_FAILURE_STATS_ROWS
+  Select
+    RS.RANDOM_NUMBER,
+    RS.BUILD_TS,
+    RS.FY,
+    RS.LOC_ID,
+    RS.LOC_NAME,
+    RS.AS_OF_DATE,
+    RS.GRADE,
+    RS.GRADE_TYPE_NAME,
+    v_Grade_From_Char as RPT_GRADE_FROM,
+    v_Grade_Thru_Char as RPT_GRADE_THRU,
+    p_Subject         as RPT_SUBJECT,
+    v_Dual_Credit     as RPT_DUAL_CREDIT,
+    Case When RS.GRADE <> '' Then 'UIL Students Grade ' || RS.GRADE Else 'UIL Students' End as ROW_TITLE,
+    4 as ROW_SORT,
+    4 as LINE_GROUP,
+    RS.UIL_STU_FAILING as FAILING_STU,
+    RS.UIL_STU_FAILING1 as FAILING_STU1,
+    RS.UIL_STU_FAILING2P as FAILING_STU2P,
+    RS.UIL_STU as TOTAL_STU,
+    Case When RS.UIL_STU = 0 Then 0 Else Decimal(((RS.UIL_STU_FAILING   / RS.UIL_STU) * 100),12,2)  End as FAILING_PCT,
+    Case When RS.UIL_STU = 0 Then 0 Else Decimal(((RS.UIL_STU_FAILING1  / RS.UIL_STU) * 100),12,2)  End as FAILING_PCT1,
+    Case When RS.UIL_STU = 0 Then 0 Else Decimal(((RS.UIL_STU_FAILING2P / RS.UIL_STU) * 100),12,2)  End as FAILING_PCT2P
+    
+  From SESSION_CUST_RPT_FAILURE_STATS_RAW RS
+
+  Where RS.RANDOM_NUMBER = v_Random_Number
+;
+-- ........................................................................
+Insert into SESSION_CUST_RPT_FAILURE_STATS_ROWS
+  Select
+    RS.RANDOM_NUMBER,
+    RS.BUILD_TS,
+    RS.FY,
+    RS.LOC_ID,
+    RS.LOC_NAME,
+    RS.AS_OF_DATE,
+    RS.GRADE,
+    RS.GRADE_TYPE_NAME,
+    v_Grade_From_Char as RPT_GRADE_FROM,
+    v_Grade_Thru_Char as RPT_GRADE_THRU,
+    p_Subject         as RPT_SUBJECT,
+    v_Dual_Credit     as RPT_DUAL_CREDIT,
+    Case When RS.GRADE <> '' Then 'Non-UIL Students Grade ' || RS.GRADE Else 'Non-UIL Students' End as ROW_TITLE,
+    5 as ROW_SORT,
+    4 as LINE_GROUP,
+    RS.NON_UIL_STU_FAILING as FAILING_STU,
+    RS.NON_UIL_STU_FAILING1 as FAILING_STU1,
+    RS.NON_UIL_STU_FAILING2P as FAILING_STU2P,
+    RS.NON_UIL_STU as TOTAL_STU,
+    Case When RS.NON_UIL_STU = 0 Then 0 Else Decimal(((RS.NON_UIL_STU_FAILING   / RS.NON_UIL_STU) * 100),12,2)  End as FAILING_PCT,
+    Case When RS.NON_UIL_STU = 0 Then 0 Else Decimal(((RS.NON_UIL_STU_FAILING1  / RS.NON_UIL_STU) * 100),12,2)  End as FAILING_PCT1,
+    Case When RS.NON_UIL_STU = 0 Then 0 Else Decimal(((RS.NON_UIL_STU_FAILING2P / RS.NON_UIL_STU) * 100),12,2)  End as FAILING_PCT2P
+  
+  From SESSION_CUST_RPT_FAILURE_STATS_RAW RS
+
+  Where RS.RANDOM_NUMBER = v_Random_Number
+;
+-- ........................................................................
+Insert into SESSION_CUST_RPT_FAILURE_STATS_ROWS
+  Select
+    RS.RANDOM_NUMBER,
+    RS.BUILD_TS,
+    RS.FY,
+    RS.LOC_ID,
+    RS.LOC_NAME,
+    RS.AS_OF_DATE,
+    RS.GRADE,
+    RS.GRADE_TYPE_NAME,
+    v_Grade_From_Char as RPT_GRADE_FROM,
+    v_Grade_Thru_Char as RPT_GRADE_THRU,
+    p_Subject         as RPT_SUBJECT,
+    v_Dual_Credit     as RPT_DUAL_CREDIT,
+    Case When RS.GRADE <> '' Then 'LEP Students Grade ' || RS.GRADE Else 'LEP Students' End as ROW_TITLE,
+    6 as ROW_SORT,
+    6 as LINE_GROUP,
+    RS.LEP_FAILING as FAILING_STU,
+    RS.LEP_FAILING1 as FAILING_STU1,
+    RS.LEP_FAILING2P as FAILING_STU2P,
+    RS.LEP as TOTAL_STU,
+    Case When RS.LEP = 0 Then 0 Else Decimal(((RS.LEP_FAILING   / RS.LEP) * 100),12,2)  End as FAILING_PCT,
+    Case When RS.LEP = 0 Then 0 Else Decimal(((RS.LEP_FAILING1  / RS.LEP) * 100),12,2)  End as FAILING_PCT1,
+    Case When RS.LEP = 0 Then 0 Else Decimal(((RS.LEP_FAILING2P / RS.LEP) * 100),12,2)  End as FAILING_PCT2P
+    
+  From SESSION_CUST_RPT_FAILURE_STATS_RAW RS
+
+  Where RS.RANDOM_NUMBER = v_Random_Number
+;
+-- ........................................................................
+Insert into SESSION_CUST_RPT_FAILURE_STATS_ROWS
+  Select
+    RS.RANDOM_NUMBER,
+    RS.BUILD_TS,
+    RS.FY,
+    RS.LOC_ID,
+    RS.LOC_NAME,
+    RS.AS_OF_DATE,
+    RS.GRADE,
+    RS.GRADE_TYPE_NAME,
+    v_Grade_From_Char as RPT_GRADE_FROM,
+    v_Grade_Thru_Char as RPT_GRADE_THRU,
+    p_Subject         as RPT_SUBJECT,
+    v_Dual_Credit     as RPT_DUAL_CREDIT,
+    Case When RS.GRADE <> '' Then 'Non-LEP Students Grade ' || RS.GRADE Else 'Non-LEP Students' End as ROW_TITLE,
+    7 as ROW_SORT,
+    6 as LINE_GROUP,
+    RS.NON_LEP_FAILING as FAILING_STU,
+    RS.NON_LEP_FAILING1 as FAILING_STU1,
+    RS.NON_LEP_FAILING2P as FAILING_STU2P,
+    RS.NON_LEP as TOTAL_STU,
+    Case When RS.NON_LEP = 0 Then 0 Else Decimal(((RS.NON_LEP_FAILING   / RS.NON_LEP) * 100),12,2)  End as FAILING_PCT,
+    Case When RS.NON_LEP = 0 Then 0 Else Decimal(((RS.NON_LEP_FAILING1  / RS.NON_LEP) * 100),12,2)  End as FAILING_PCT1,
+    Case When RS.NON_LEP = 0 Then 0 Else Decimal(((RS.NON_LEP_FAILING2P / RS.NON_LEP) * 100),12,2)  End as FAILING_PCT2P
+    
+  From SESSION_CUST_RPT_FAILURE_STATS_RAW RS
+
+  Where RS.RANDOM_NUMBER = v_Random_Number
+;
+-- ........................................................................
+Insert into SESSION_CUST_RPT_FAILURE_STATS_ROWS
+  Select
+    RS.RANDOM_NUMBER,
+    RS.BUILD_TS,
+    RS.FY,
+    RS.LOC_ID,
+    RS.LOC_NAME,
+    RS.AS_OF_DATE,
+    RS.GRADE,
+    RS.GRADE_TYPE_NAME,
+    v_Grade_From_Char as RPT_GRADE_FROM,
+    v_Grade_Thru_Char as RPT_GRADE_THRU,
+    p_Subject         as RPT_SUBJECT,
+    v_Dual_Credit     as RPT_DUAL_CREDIT,
+    Case When RS.GRADE <> '' Then 'African American Grade ' || RS.GRADE Else 'African American' End as ROW_TITLE,
+    8 as ROW_SORT,
+    8 as LINE_GROUP,
+    RS.AFRICAN_AM_FAILING as FAILING_STU,
+    RS.AFRICAN_AM_FAILING1 as FAILING_STU1,
+    RS.AFRICAN_AM_FAILING2P as FAILING_STU2P,
+    RS.AFRICAN_AM as TOTAL_STU,
+    Case When RS.AFRICAN_AM = 0 Then 0 Else Decimal(((RS.AFRICAN_AM_FAILING   / RS.AFRICAN_AM) * 100),12,2)  End as FAILING_PCT,
+    Case When RS.AFRICAN_AM = 0 Then 0 Else Decimal(((RS.AFRICAN_AM_FAILING1  / RS.AFRICAN_AM) * 100),12,2)  End as FAILING_PCT1,
+    Case When RS.AFRICAN_AM = 0 Then 0 Else Decimal(((RS.AFRICAN_AM_FAILING2P / RS.AFRICAN_AM) * 100),12,2)  End as FAILING_PCT2P
+  
+  From SESSION_CUST_RPT_FAILURE_STATS_RAW RS
+
+  Where RS.RANDOM_NUMBER = v_Random_Number
+;
+-- ........................................................................
+Insert into SESSION_CUST_RPT_FAILURE_STATS_ROWS
+  Select
+    RS.RANDOM_NUMBER,
+    RS.BUILD_TS,
+    RS.FY,
+    RS.LOC_ID,
+    RS.LOC_NAME,
+    RS.AS_OF_DATE,
+    RS.GRADE,
+    RS.GRADE_TYPE_NAME,
+    v_Grade_From_Char as RPT_GRADE_FROM,
+    v_Grade_Thru_Char as RPT_GRADE_THRU,
+    p_Subject         as RPT_SUBJECT,
+    v_Dual_Credit     as RPT_DUAL_CREDIT,
+    Case When RS.GRADE <> '' Then 'Hispanic Grade ' || RS.GRADE Else 'Hispanic' End as ROW_TITLE,
+    9 as ROW_SORT,
+    8 as LINE_GROUP,
+    RS.HISPANIC_FAILING as FAILING_STU,
+    RS.HISPANIC_FAILING1 as FAILING_STU1,
+    RS.HISPANIC_FAILING2P as FAILING_STU2P,
+    RS.HISPANIC as TOTAL_STU,
+    Case When RS.HISPANIC = 0 Then 0 Else Decimal(((RS.HISPANIC_FAILING   / RS.HISPANIC) * 100),12,2)  End as FAILING_PCT,
+    Case When RS.HISPANIC = 0 Then 0 Else Decimal(((RS.HISPANIC_FAILING1  / RS.HISPANIC) * 100),12,2)  End as FAILING_PCT1,
+    Case When RS.HISPANIC = 0 Then 0 Else Decimal(((RS.HISPANIC_FAILING2P / RS.HISPANIC) * 100),12,2)  End as FAILING_PCT2P
+  
+  From SESSION_CUST_RPT_FAILURE_STATS_RAW RS
+
+  Where RS.RANDOM_NUMBER = v_Random_Number
+;
+-- ........................................................................
+Insert into SESSION_CUST_RPT_FAILURE_STATS_ROWS
+  Select
+    RS.RANDOM_NUMBER,
+    RS.BUILD_TS,
+    RS.FY,
+    RS.LOC_ID,
+    RS.LOC_NAME,
+    RS.AS_OF_DATE,
+    RS.GRADE,
+    RS.GRADE_TYPE_NAME,
+    v_Grade_From_Char as RPT_GRADE_FROM,
+    v_Grade_Thru_Char as RPT_GRADE_THRU,
+    p_Subject         as RPT_SUBJECT,
+    v_Dual_Credit     as RPT_DUAL_CREDIT,
+    Case When RS.GRADE <> '' Then 'White Grade ' || RS.GRADE Else 'White' End as ROW_TITLE,
+    10 as ROW_SORT,
+    8 as LINE_GROUP,
+    RS.WHITE_FAILING as FAILING_STU,
+    RS.WHITE_FAILING1 as FAILING_STU1,
+    RS.WHITE_FAILING2P as FAILING_STU2P,
+    RS.WHITE as TOTAL_STU,
+    Case When RS.WHITE = 0 Then 0 Else Decimal(((RS.WHITE_FAILING   / RS.WHITE) * 100),12,2)  End as FAILING_PCT,
+    Case When RS.WHITE = 0 Then 0 Else Decimal(((RS.WHITE_FAILING1  / RS.WHITE) * 100),12,2)  End as FAILING_PCT1,
+    Case When RS.WHITE = 0 Then 0 Else Decimal(((RS.WHITE_FAILING2P / RS.WHITE) * 100),12,2)  End as FAILING_PCT2P
+  
+  From SESSION_CUST_RPT_FAILURE_STATS_RAW RS
+
+  Where RS.RANDOM_NUMBER = v_Random_Number
+;
+-- ........................................................................
+Insert into SESSION_CUST_RPT_FAILURE_STATS_ROWS
+  Select
+    RS.RANDOM_NUMBER,
+    RS.BUILD_TS,
+    RS.FY,
+    RS.LOC_ID,
+    RS.LOC_NAME,
+    RS.AS_OF_DATE,
+    RS.GRADE,
+    RS.GRADE_TYPE_NAME,
+    v_Grade_From_Char as RPT_GRADE_FROM,
+    v_Grade_Thru_Char as RPT_GRADE_THRU,
+    p_Subject         as RPT_SUBJECT,
+    v_Dual_Credit     as RPT_DUAL_CREDIT,
+    Case When RS.GRADE <> '' Then 'Other Ethnicities Grade ' || RS.GRADE Else 'Other Ethnicities' End as ROW_TITLE,
+    11 as ROW_SORT,
+    8 as LINE_GROUP,
+    RS.OTHER_ETH_FAILING as FAILING_STU,
+    RS.OTHER_ETH_FAILING1 as FAILING_STU1,
+    RS.OTHER_ETH_FAILING2P as FAILING_STU2P,
+    RS.OTHER_ETH as TOTAL_STU,
+    Case When RS.OTHER_ETH = 0 Then 0 Else Decimal(((RS.OTHER_ETH_FAILING   / RS.OTHER_ETH) * 100),12,2)  End as FAILING_PCT,
+    Case When RS.OTHER_ETH = 0 Then 0 Else Decimal(((RS.OTHER_ETH_FAILING1  / RS.OTHER_ETH) * 100),12,2)  End as FAILING_PCT1,
+    Case When RS.OTHER_ETH = 0 Then 0 Else Decimal(((RS.OTHER_ETH_FAILING2P / RS.OTHER_ETH) * 100),12,2)  End as FAILING_PCT2P
+  
+  From SESSION_CUST_RPT_FAILURE_STATS_RAW RS
+
+  Where RS.RANDOM_NUMBER = v_Random_Number
+;
+-- ........................................................................
+Insert into SESSION_CUST_RPT_FAILURE_STATS_ROWS
+  Select
+    RS.RANDOM_NUMBER,
+    RS.BUILD_TS,
+    RS.FY,
+    RS.LOC_ID,
+    RS.LOC_NAME,
+    RS.AS_OF_DATE,
+    RS.GRADE,
+    RS.GRADE_TYPE_NAME,
+    v_Grade_From_Char as RPT_GRADE_FROM,
+    v_Grade_Thru_Char as RPT_GRADE_THRU,
+    p_Subject         as RPT_SUBJECT,
+    v_Dual_Credit     as RPT_DUAL_CREDIT,
+    Case When RS.GRADE <> '' Then 'Male Grade ' || RS.GRADE Else 'Male' End as ROW_TITLE,
+    12 as ROW_SORT,
+    12 as LINE_GROUP,
+    RS.MALE_FAILING as FAILING_STU,
+    RS.MALE_FAILING1 as FAILING_STU1,
+    RS.MALE_FAILING2P as FAILING_STU2P,
+    RS.MALE as TOTAL_STU,
+    Case When RS.MALE = 0 Then 0 Else Decimal(((RS.MALE_FAILING   / RS.MALE) * 100),12,2)  End as FAILING_PCT,
+    Case When RS.MALE = 0 Then 0 Else Decimal(((RS.MALE_FAILING1  / RS.MALE) * 100),12,2)  End as FAILING_PCT1,
+    Case When RS.MALE = 0 Then 0 Else Decimal(((RS.MALE_FAILING2P / RS.MALE) * 100),12,2)  End as FAILING_PCT2P
+  
+  From SESSION_CUST_RPT_FAILURE_STATS_RAW RS
+
+  Where RS.RANDOM_NUMBER = v_Random_Number
+;
+-- ........................................................................
+Insert into SESSION_CUST_RPT_FAILURE_STATS_ROWS
+  Select
+    RS.RANDOM_NUMBER,
+    RS.BUILD_TS,
+    RS.FY,
+    RS.LOC_ID,
+    RS.LOC_NAME,
+    RS.AS_OF_DATE,
+    RS.GRADE,
+    RS.GRADE_TYPE_NAME,
+    v_Grade_From_Char as RPT_GRADE_FROM,
+    v_Grade_Thru_Char as RPT_GRADE_THRU,
+    p_Subject         as RPT_SUBJECT,
+    v_Dual_Credit     as RPT_DUAL_CREDIT,
+    Case When RS.GRADE <> '' Then 'Female Grade ' || RS.GRADE Else 'Female' End as ROW_TITLE,
+    13 as ROW_SORT,
+    12 as LINE_GROUP,
+    RS.FEMALE_FAILING as FAILING_STU,
+    RS.FEMALE_FAILING1 as FAILING_STU1,
+    RS.FEMALE_FAILING2P as FAILING_STU2P,
+    RS.FEMALE as TOTAL_STU,
+    Case When RS.FEMALE = 0 Then 0 Else Decimal(((RS.FEMALE_FAILING   / RS.FEMALE) * 100),12,2)  End as FAILING_PCT,
+    Case When RS.FEMALE = 0 Then 0 Else Decimal(((RS.FEMALE_FAILING1  / RS.FEMALE) * 100),12,2)  End as FAILING_PCT1,
+    Case When RS.FEMALE = 0 Then 0 Else Decimal(((RS.FEMALE_FAILING2P / RS.FEMALE) * 100),12,2)  End as FAILING_PCT2P
+  
+  From SESSION_CUST_RPT_FAILURE_STATS_RAW RS
+
+  Where RS.RANDOM_NUMBER = v_Random_Number
+;
+-- ........................................................................
+
+--############################################################################## 
+--
+--############################################################################## 
+
+-- If Grade Level Detail Requested is Minimum, remove Stats that are Not Considered Minimum
+If v_Grade_Level_Detail = 'MINIMUM' Then 
+
+  Delete From SESSION_CUST_RPT_FAILURE_STATS_ROWS RS
+  Where RS.GRADE <> ''                                  -- Grade Detail Row
+    and RS.ROW_SORT > 3                                 -- Row Sort > L@S
+    and RS.RANDOM_NUMBER = v_Random_Number
+  ;
+
+End If;
+
+
+--############################################################################## 
+-- Possible that user Wants One Campus and District, but we built all campuses 
+--   in order to Get the District Summary,  If so, this will wipe out the 
+--   other campuses, leaving the Requested Campus and District Summary
+--############################################################################## 
+
+If v_Campus <> 'ALL' Then
+
+  Delete From SESSION_CUST_RPT_FAILURE_STATS_ROWS RS 
+  Where RS.LOC_ID not in (v_Campus,'999')
+    and RS.RANDOM_NUMBER = v_Random_Number
+  ;
+End If;
+
+
+
+--Select * From SESSION_CUST_RPT_FAILURE_STATS_ROWS Order By BUILD_TS asc
+--Call SP_C_RPT_FAILURE_STATS({?p_FiscalYear},'{?p_Campus}','{?p_Calendar}',{?p_Grade_From},{?p_Grade_Thru},'{?p_Subject}','{?p_Dual_Credit}','{?p_Grade_Type_Name}','{?p_Grade_Level_Detail}','{?p_District_Summary}','{?p_Include_Boshears}','{?p_Order_By}')
+
+--############################################################################## 
+--Prepare Result Set
+
+--Set vTmpSQL = 'Select ''Finished'' as Note From PERSON Where PER_ID = ''1494097''';  --<C002>
+--Set vTmpSQL = 'SELECT TMP.* FROM SESSION_CUST_RPT_FAILURE_STATS_STU as TMP';
+
+If v_Order_By = 'STUDENT CATEGORY' Then
+  Set vTmpSQL = 'Select T.* From SESSION_CUST_RPT_FAILURE_STATS_ROWS T Where T.RANDOM_NUMBER = ''' || v_Random_Number || ''' '  || 'Order By T.ROW_SORT, T.ROW_TITLE, T.LOC_ID';
+Else
+  Set vTmpSQL = 'Select T.* From SESSION_CUST_RPT_FAILURE_STATS_ROWS T Where T.RANDOM_NUMBER = ''' || v_Random_Number || ''' '  || 'Order By T.LOC_ID, T.ROW_SORT, T.ROW_TITLE';
+End If;
+
+
+Prepare STMNT1_NAME From vTmpSQL;
+ 
+-- Open result Set for Procedure.
+Open vResultSetCur;
+ 
+-- End of Stored Procedure
+End
+#/
